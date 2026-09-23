@@ -9,7 +9,8 @@
 //    é reenviada quando a conexão voltar.
 //  - O que aparece na tela é sempre: server + operações ainda na fila.
 //  - O saldo de estrelas nunca é gravado: é recalculado a partir dos
-//    registros (recompute), então nunca fica inconsistente.
+//    registros (recompute), então nunca fica inconsistente. Os registros são
+//    aplicados em ordem de horário e o saldo nunca sai do intervalo 0..meta.
 
 import { supabase } from './supabase.js'
 import { addDays, dateKey } from './dates.js'
@@ -60,7 +61,9 @@ export function safeRemove(key) {
 }
 
 export function recompute(events, baseStars, goalStars) {
-  const stars = Math.max(0, events.reduce((sum, e) => sum + e.delta, baseStars))
+  const clamp = (n) => Math.min(goalStars, Math.max(0, n))
+  let stars = clamp(baseStars)
+  for (const e of [...events].sort((a, b) => a.time - b.time)) stars = clamp(stars + e.delta)
   return { stars, goalReached: stars >= goalStars }
 }
 
@@ -433,9 +436,15 @@ export class FamilyStore {
     }
   }
 
+  // Devolve null se não houver o que registrar (meta já batida)
   addEvent(type, label, delta) {
     this.checkDate()
-    const signed = type === 'gain' ? Math.abs(delta) : -Math.abs(delta)
+    let signed = type === 'gain' ? Math.abs(delta) : -Math.abs(delta)
+    if (type === 'gain') {
+      const room = this.snapshot.config.goalStars - this.snapshot.day.stars
+      if (room <= 0) return null
+      signed = Math.min(signed, room) // registra só o que de fato conta
+    }
     const event = {
       id: newId(),
       date: this.date,
@@ -476,6 +485,11 @@ export class FamilyStore {
         row: { date: this.date, base_stars: config.baseStars, goal_stars: config.goalStars }
       }
     )
+  }
+
+  // Nome/avatar da criança etc. — só a configuração, sem mexer no dia
+  patchConfig(patch) {
+    this.setConfig({ ...this.snapshot.config, ...patch })
   }
 
   addCategory(kind, label, delta) {

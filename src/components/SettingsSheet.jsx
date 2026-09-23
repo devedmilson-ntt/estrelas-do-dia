@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react'
 import Sheet from './Sheet.jsx'
-import { formatCode, friendlyError, leaveFamily, shareFamilyCode } from '../lib/family.js'
+import { formatCode, friendlyError, leaveFamily } from '../lib/family.js'
+import InviteButton from './InviteButton.jsx'
+import { isSoundOn, playCelebration, setSoundOn } from '../lib/sound.js'
+import { AVATARS } from './ChildMode.jsx'
 
 function FamilySection({ family, members, userId, pending, onLeft }) {
-  const [shareMsg, setShareMsg] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-
-  async function share() {
-    const r = await shareFamilyCode(family.code)
-    setShareMsg(r === 'copied' ? 'Convite copiado! Cole no WhatsApp da família.' : '')
-  }
 
   async function leave() {
     setBusy(true)
@@ -28,18 +25,15 @@ function FamilySection({ family, members, userId, pending, onLeft }) {
   return (
     <div className="mb-5 pb-5 border-b-2" style={{ borderColor: 'var(--line)' }}>
       <h4 className="font-display text-[14px] mt-0 mb-2.5 text-ink font-semibold">Família</h4>
-      <div className="flex items-center gap-2.5 mb-1">
+      <div className="flex flex-wrap items-center gap-x-2.5 mb-1">
         <span className="flex-1 font-display font-bold text-[22px] tracking-[0.1em] text-ink">{formatCode(family.code)}</span>
-        <button
-          type="button"
+        <InviteButton
+          code={family.code}
           className="border-2 border-ink bg-teal text-teal-text rounded-xl py-2 px-3.5 text-[13px] font-bold whitespace-nowrap"
-          onClick={share}
-        >
-          Enviar convite
-        </button>
+        />
       </div>
       <p className="text-[12px] font-semibold text-ink-soft mt-0 mb-3 min-h-[16px]">
-        {shareMsg || 'Quem tiver este código pode ver e registrar estrelas.'}
+        Quem tiver este código pode ver e registrar estrelas.
       </p>
 
       <div className="flex flex-wrap gap-2 mb-3">
@@ -200,12 +194,17 @@ export default function SettingsSheet({
   const [baseStars, setBaseStars] = useState(config.baseStars)
   const [goalStars, setGoalStars] = useState(config.goalStars)
   const [rewardMinutes, setRewardMinutes] = useState(config.rewardMinutes)
+  const [childName, setChildName] = useState(config.childName || '')
+  const [childAvatar, setChildAvatar] = useState(config.childAvatar || '')
+  const [sound, setSound] = useState(() => isSoundOn())
 
   useEffect(() => {
     if (open) {
       setBaseStars(config.baseStars)
       setGoalStars(config.goalStars)
       setRewardMinutes(config.rewardMinutes)
+      setChildName(config.childName || '')
+      setChildAvatar(config.childAvatar || '')
     }
   }, [open, config])
 
@@ -213,7 +212,9 @@ export default function SettingsSheet({
     onSaveRules({
       baseStars: Math.max(0, baseStars || 0),
       goalStars: Math.max(1, goalStars || 8),
-      rewardMinutes: Math.max(5, rewardMinutes || 60)
+      rewardMinutes: Math.max(5, rewardMinutes || 60),
+      childName: childName.trim().slice(0, 30),
+      childAvatar
     })
     onClose()
   }
@@ -221,6 +222,65 @@ export default function SettingsSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Configurações">
       <FamilySection family={family} members={members} userId={userId} pending={pending} onLeft={onLeft} />
+
+      <div className="mb-5 pb-5 border-b-2" style={{ borderColor: 'var(--line)' }}>
+        <h4 className="font-display text-[14px] mt-0 mb-2.5 text-ink font-semibold">Criança</h4>
+        <label className="flex items-center justify-between text-[14px] font-semibold text-ink mb-3 gap-2.5">
+          Nome
+          <input
+            type="text"
+            maxLength={30}
+            placeholder="Ex.: Gabriel"
+            value={childName}
+            onChange={(e) => setChildName(e.target.value)}
+            className="w-[160px] border-2 rounded-xl py-1.5 px-2.5 font-semibold bg-bg text-ink"
+            style={{ borderColor: 'var(--line)' }}
+          />
+        </label>
+        <p className="text-[14px] font-semibold text-ink mt-0 mb-2">Avatar</p>
+        <div className="grid grid-cols-8 gap-1 mb-3">
+          {AVATARS.map((a) => (
+            <button
+              key={a}
+              type="button"
+              aria-label={'Avatar ' + a}
+              aria-pressed={a === childAvatar}
+              className="text-[24px] leading-none py-1.5 rounded-lg border-2"
+              style={{
+                borderColor: a === childAvatar ? 'var(--ink)' : 'transparent',
+                background: a === childAvatar ? 'var(--violet-soft)' : 'transparent'
+              }}
+              onClick={() => setChildAvatar(a)}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center justify-between text-[14px] font-semibold text-ink gap-2.5">
+          <span>
+            Som ao bater a meta
+            <span className="block text-[12px] text-ink-soft">Só neste aparelho</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={sound}
+            onChange={(e) => {
+              setSound(e.target.checked)
+              setSoundOn(e.target.checked)
+              if (e.target.checked) playCelebration({ force: true })
+            }}
+            className="w-6 h-6 accent-[var(--violet)]"
+          />
+        </label>
+        <button
+          type="button"
+          className="mt-2.5 border-2 border-ink bg-violet-soft text-violet rounded-xl py-2 px-3.5 text-[13px] font-bold"
+          onClick={() => playCelebration({ force: true })}
+        >
+          🔊 Testar som
+        </button>
+      </div>
+
 
       <label className="flex items-center justify-between text-[14px] font-semibold text-ink mb-3.5 gap-2.5">
         Estrelas no início do dia

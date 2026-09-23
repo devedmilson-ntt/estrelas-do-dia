@@ -125,3 +125,53 @@ button {
     transform: scale(1);
   }
 }
+
+/* Comemoração ao bater a meta */
+.confetti {
+  position: absolute;
+  top: -20px;
+  animation-name: confettiFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes confettiFall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--drift, 0), 105vh) rotate(720deg);
+    opacity: 0.9;
+  }
+}
+.celebrate-card {
+  animation: celebratePop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes celebratePop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
+  .celebrate-card {
+    animation: none;
+  }
+}
+
+/* Botão "segure para sair" do modo criança */
+.hold-fill {
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+.hold-fill.holding {
+  transform: scaleX(1);
+  transition: transform 2s linear;
+}
