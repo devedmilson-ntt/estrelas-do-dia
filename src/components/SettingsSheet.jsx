@@ -1,5 +1,98 @@
 import { useEffect, useState } from 'react'
 import Sheet from './Sheet.jsx'
+import { formatCode, friendlyError, leaveFamily, shareFamilyCode } from '../lib/family.js'
+
+function FamilySection({ family, members, userId, pending, onLeft }) {
+  const [shareMsg, setShareMsg] = useState('')
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function share() {
+    const r = await shareFamilyCode(family.code)
+    setShareMsg(r === 'copied' ? 'Convite copiado! Cole no WhatsApp da família.' : '')
+  }
+
+  async function leave() {
+    setBusy(true)
+    setError('')
+    try {
+      await leaveFamily(family)
+      onLeft()
+    } catch (e) {
+      setError(friendlyError(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mb-5 pb-5 border-b-2" style={{ borderColor: 'var(--line)' }}>
+      <h4 className="font-display text-[14px] mt-0 mb-2.5 text-ink font-semibold">Família</h4>
+      <div className="flex items-center gap-2.5 mb-1">
+        <span className="flex-1 font-display font-bold text-[22px] tracking-[0.1em] text-ink">{formatCode(family.code)}</span>
+        <button
+          type="button"
+          className="border-2 border-ink bg-teal text-teal-text rounded-xl py-2 px-3.5 text-[13px] font-bold whitespace-nowrap"
+          onClick={share}
+        >
+          Enviar convite
+        </button>
+      </div>
+      <p className="text-[12px] font-semibold text-ink-soft mt-0 mb-3 min-h-[16px]">
+        {shareMsg || 'Quem tiver este código pode ver e registrar estrelas.'}
+      </p>
+
+      <div className="flex flex-wrap gap-2 mb-3">
+        {members.map((m) => (
+          <span
+            key={m.user_id}
+            className="border-2 rounded-full py-1 px-3 text-[13px] font-semibold text-ink"
+            style={{ borderColor: 'var(--line)' }}
+          >
+            {m.display_name}
+            {m.user_id === userId ? ' (você)' : ''}
+          </span>
+        ))}
+      </div>
+
+      {!confirmLeave ? (
+        <button
+          type="button"
+          className="bg-transparent border-none p-0 text-[13px] font-bold"
+          style={{ color: 'var(--coral)' }}
+          onClick={() => setConfirmLeave(true)}
+        >
+          Sair desta família neste aparelho
+        </button>
+      ) : (
+        <div className="bg-bg border-2 rounded-[14px] p-3" style={{ borderColor: 'var(--line)' }}>
+          <p className="text-[13px] font-semibold text-ink mt-0 mb-2.5">
+            Este aparelho vai parar de ver as estrelas da família (os dados continuam salvos para os outros).
+            {pending > 0 && ` Atenção: ${pending} alteração(ões) ainda não foram enviadas e serão perdidas.`}
+          </p>
+          {error && <p className="text-[12px] font-semibold mt-0 mb-2" style={{ color: 'var(--coral)' }}>{error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className="flex-1 border-2 border-ink rounded-xl py-2 text-[13px] font-bold bg-coral-soft text-coral"
+              onClick={leave}
+            >
+              {busy ? 'Saindo…' : 'Sair'}
+            </button>
+            <button
+              type="button"
+              className="flex-1 border-2 border-ink rounded-xl py-2 text-[13px] font-bold bg-card text-ink"
+              onClick={() => setConfirmLeave(false)}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function CategoryList({ items, kind, onRemove }) {
   return (
@@ -91,7 +184,19 @@ function AddCategoryForm({ kind, onAdd }) {
   )
 }
 
-export default function SettingsSheet({ open, config, onClose, onSaveRules, onAddCategory, onRemoveCategory }) {
+export default function SettingsSheet({
+  open,
+  config,
+  onClose,
+  onSaveRules,
+  onAddCategory,
+  onRemoveCategory,
+  family,
+  members,
+  userId,
+  pending,
+  onLeft
+}) {
   const [baseStars, setBaseStars] = useState(config.baseStars)
   const [goalStars, setGoalStars] = useState(config.goalStars)
   const [rewardMinutes, setRewardMinutes] = useState(config.rewardMinutes)
@@ -115,6 +220,8 @@ export default function SettingsSheet({ open, config, onClose, onSaveRules, onAd
 
   return (
     <Sheet open={open} onClose={onClose} title="Configurações">
+      <FamilySection family={family} members={members} userId={userId} pending={pending} onLeft={onLeft} />
+
       <label className="flex items-center justify-between text-[14px] font-semibold text-ink mb-3.5 gap-2.5">
         Estrelas no início do dia
         <input

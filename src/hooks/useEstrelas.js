@@ -1,146 +1,42 @@
-import { useCallback, useEffect, useState } from 'react'
-import { dateKey, lastSevenDayKeys } from '../lib/dates.js'
-import * as store from '../lib/storage.js'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { FamilyStore } from '../lib/storage.js'
 
-function recompute(day, cfg) {
-  const total = day.events.reduce((sum, e) => sum + e.delta, cfg.baseStars)
-  const stars = Math.max(0, total)
-  return { ...day, stars, goalReached: stars >= cfg.goalStars }
-}
+export function useEstrelas(family, { onMembershipLost } = {}) {
+  const store = useMemo(() => new FamilyStore(family, { onMembershipLost }), [family.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-export function useEstrelas() {
-  const [config, setConfigState] = useState(() => store.getConfig())
-  const [day, setDayState] = useState(() => {
-    const cfg = store.getConfig()
-    return recompute(store.getDay(dateKey(), cfg), cfg)
-  })
-
-  // Persiste config sempre que muda
   useEffect(() => {
-    store.setConfig(config)
-  }, [config])
+    store.start()
+    return () => store.stop()
+  }, [store])
 
-  // Persiste o dia sempre que muda
-  useEffect(() => {
-    store.setDay(day)
-  }, [day])
+  const snap = useSyncExternalStore(store.subscribe, store.getSnapshot)
 
-  // Verifica virada de dia a cada minuto (o app fica aberto no fim do dia,
-  // então isso garante o reset automático sem precisar recarregar a página)
-  useEffect(() => {
-    const id = setInterval(() => {
-      const key = dateKey()
-      if (key !== day.date) {
-        setDayState(recompute(store.getDay(key, config), config))
-      }
-    }, 60 * 1000)
-    return () => clearInterval(id)
-  }, [day.date, config])
-
-  const addEvent = useCallback(
-    (type, label, delta) => {
-      const signed = type === 'gain' ? Math.abs(delta) : -Math.abs(delta)
-      const event = {
-        id: 'e' + Date.now() + Math.random().toString(16).slice(2, 6),
-        delta: signed,
-        reason: label,
-        time: Date.now()
-      }
-      setDayState((prev) => recompute({ ...prev, events: [...prev.events, event] }, config))
-      return event
-    },
-    [config]
+  // Últimos 7 dias (6 anteriores + hoje), do mais antigo para o mais novo
+  const week = useMemo(
+    () => [
+      ...snap.past
+        .slice(0, 6)
+        .reverse()
+        .map((d) => ({ date: d.date, goalReached: d.goalReached, hasData: d.hasData, isToday: false })),
+      { date: snap.day.date, goalReached: snap.day.goalReached, hasData: true, isToday: true }
+    ],
+    [snap.past, snap.day]
   )
 
-  // Remove um registro do dia. O total é recalculado do zero a partir dos
-  // eventos restantes (recompute), então o saldo nunca fica inconsistente.
-  const removeEvent = useCallback(
-    (id) => {
-      setDayState((prev) => {
-        if (!prev.events.some((e) => e.id === id)) return prev
-        return recompute({ ...prev, events: prev.events.filter((e) => e.id !== id) }, config)
-      })
-    },
-    [config]
+  const history = useMemo(() => snap.past.filter((d) => d.hasData), [snap.past])
+
+  const actions = useMemo(
+    () => ({
+      addEvent: (type, label, delta) => store.addEvent(type, label, delta),
+      removeEvent: (id) => store.removeEvent(id),
+      restoreEvent: (event) => store.restoreEvent(event),
+      markRewardUsed: () => store.markRewardUsed(),
+      updateRules: (patch) => store.updateRules(patch),
+      addCategory: (kind, label, delta) => store.addCategory(kind, label, delta),
+      removeCategory: (kind, id) => store.removeCategory(kind, id)
+    }),
+    [store]
   )
 
-  // Desfaz uma remoção: devolve o evento à lista na posição original (por horário).
-  const restoreEvent = useCallback(
-    (event) => {
-      setDayState((prev) => {
-        // Evento de outro dia (virada da meia-noite) ou já presente: ignora
-        if (dateKey(new Date(event.time)) !== prev.date) return prev
-        if (prev.events.some((e) => e.id === event.id)) return prev
-        const events = [...prev.events, event].sort((a, b) => a.time - b.time)
-        return recompute({ ...prev, events }, config)
-      })
-    },
-    [config]
-  )
-
-  const markRewardUsed = useCallback(() => {
-    setDayState((prev) => ({ ...prev, rewardUsed: true, rewardUsedAt: Date.now() }))
-  }, [])
-
-  const updateRules = useCallback((patch) => {
-    setConfigState((prev) => {
-      const next = { ...prev, ...patch }
-      setDayState((d) => recompute(d, next))
-      return next
-    })
-  }, [])
-
-  const addCategory = useCallback((kind, label, delta) => {
-    setConfigState((prev) => ({
-      ...prev,
-      [kind]: [...prev[kind], { id: kind[0] + Date.now(), label, delta }]
-    }))
-  }, [])
-
-  const removeCategory = useCallback((kind, id) => {
-    setConfigState((prev) => ({
-      ...prev,
-      [kind]: prev[kind].filter((c) => c.id !== id)
-    }))
-  }, [])
-
-  const getWeekSummary = useCallback(() => {
-    const keys = lastSevenDayKeys()
-    return keys.map((k) => {
-      const d = k === day.date ? day : store.getDay(k, config)
-      let hasData = k === day.date
-      if (!hasData) {
-        try {
-          hasData = localStorage.getItem('estrelas_day_' + k) !== null
-        } catch {
-          hasData = false
-        }
-      }
-      return { date: k, goalReached: !!d.goalReached, hasData, isToday: k === day.date }
-    })
-  }, [day, config])
-
-  const getHistory = useCallback(
-    (limit = 30) => {
-      return store
-        .listDayKeys(day.date)
-        .slice(0, limit)
-        .map((k) => store.getDay(k, config))
-    },
-    [day.date, config]
-  )
-
-  return {
-    config,
-    day,
-    addEvent,
-    removeEvent,
-    restoreEvent,
-    markRewardUsed,
-    updateRules,
-    addCategory,
-    removeCategory,
-    getWeekSummary,
-    getHistory
-  }
+  return { ...snap, week, history, ...actions }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useEstrelas } from './hooks/useEstrelas.js'
 import { isWeekend } from './lib/dates.js'
 import StarRing from './components/StarRing.jsx'
@@ -14,20 +14,25 @@ function pluralize(n, singular, plural) {
   return n === 1 ? singular : plural
 }
 
-export default function App() {
+export default function App({ family, onLeft, onMembershipLost }) {
   const {
+    loaded,
+    online,
+    pending,
+    members,
+    userId,
     config,
     day,
+    week,
+    history,
     addEvent,
     removeEvent,
     restoreEvent,
     markRewardUsed,
     updateRules,
     addCategory,
-    removeCategory,
-    getWeekSummary,
-    getHistory
-  } = useEstrelas()
+    removeCategory
+  } = useEstrelas(family, { onMembershipLost })
 
   const [pickerType, setPickerType] = useState(null) // 'gain' | 'loss' | null
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -49,8 +54,6 @@ export default function App() {
     setUndo(null)
   }, [day.date])
 
-  const week = useMemo(() => getWeekSummary(), [getWeekSummary])
-  const history = useMemo(() => (historyOpen ? getHistory(30) : []), [historyOpen, getHistory])
   const weekendToday = isWeekend()
 
   function handleConfirmEvent(type, label, delta) {
@@ -75,7 +78,8 @@ export default function App() {
   let statusText
   if (day.rewardUsed) {
     const t = new Date(day.rewardUsedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    statusText = `Nintendo já foi usado hoje (às ${t}). Até amanhã!`
+    const by = day.rewardUsedBy ? `, marcado por ${day.rewardUsedBy}` : ''
+    statusText = `Nintendo já foi usado hoje (às ${t}${by}). Até amanhã!`
   } else if (day.goalReached) {
     statusText = `Meta atingida! ${config.rewardMinutes} minutos de Nintendo liberados para hoje à noite.`
   } else {
@@ -84,6 +88,14 @@ export default function App() {
   }
 
   const sortedEvents = [...day.events].reverse()
+
+  if (!loaded) {
+    return (
+      <div className="max-w-[460px] mx-auto px-[18px] pt-[80px] text-center text-ink-soft font-semibold text-[15px]">
+        {online ? 'Carregando as estrelas da família…' : 'Sem internet. Conecte-se para carregar os dados da família pela primeira vez.'}
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-[460px] mx-auto px-[18px] pt-[22px] pb-[50px]">
@@ -111,6 +123,16 @@ export default function App() {
           </svg>
         </button>
       </header>
+
+      {(!online || pending > 0) && (
+        <p role="status" className="text-center text-[12px] font-semibold text-ink-soft mt-2 mb-0">
+          {!online
+            ? pending > 0
+              ? `Sem internet — ${pending} ${pluralize(pending, 'alteração será enviada', 'alterações serão enviadas')} quando a conexão voltar.`
+              : 'Sem internet — mostrando os últimos dados salvos.'
+            : 'Sincronizando…'}
+        </p>
+      )}
 
       <section className="text-center my-[22px]">
         <StarRing stars={day.stars} goal={config.goalStars} pulseKey={pulseKey} />
@@ -171,7 +193,10 @@ export default function App() {
                   {positive ? '+' : ''}
                   {ev.delta}
                 </span>
-                <span className="text-ink font-semibold flex-1">{ev.reason}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="text-ink font-semibold">{ev.reason}</span>
+                  {ev.by && <span className="block text-ink-soft font-semibold text-[11px]">por {ev.by}</span>}
+                </span>
                 <button
                   type="button"
                   aria-label={`Remover registro: ${ev.reason}`}
@@ -203,6 +228,11 @@ export default function App() {
         onSaveRules={updateRules}
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
+        family={family}
+        members={members}
+        userId={userId}
+        pending={pending}
+        onLeft={onLeft}
       />
 
       {undo && (
