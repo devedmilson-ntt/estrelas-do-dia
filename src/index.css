@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #FFF6E9;
+  --card: #FFFFFF;
+  --ink: #3B2A55;
+  --ink-soft: #7A6693;
+  --gold: #FFC145;
+  --gold-glow: #FFD666;
+  --star-empty: #E4D9F2;
+  --teal: #3EC1B3;
+  --teal-text: #1F3D3A;
+  --green: #1F6E63;
+  --green-soft: #D9F3EF;
+  --pink: #FF6B9D;
+  --pink-text: #5A1030;
+  --coral: #A3184F;
+  --coral-soft: #FFE1EC;
+  --violet: #7A5FE0;
+  --violet-soft: #EDE7FB;
+  --line: #EAD9C8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #241B3D;
+    --card: #332753;
+    --ink: #FBF3E4;
+    --ink-soft: #C7B8E0;
+    --gold: #FFD666;
+    --gold-glow: #FFE699;
+    --star-empty: #4A3D6E;
+    --teal: #4ED8C5;
+    --teal-text: #0F2E29;
+    --green: #8FEDDA;
+    --green-soft: #1F3D3A;
+    --pink: #FF8FB3;
+    --pink-text: #3D0A22;
+    --coral: #FFB3CB;
+    --coral-soft: #3D1B2C;
+    --violet: #A896FF;
+    --violet-soft: #3A2F63;
+    --line: #4A3D6E;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Quicksand', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+}
+
+input,
+button {
+  font-size: 16px;
+}
+
+@layer components {
+  .icon-btn {
+    @apply flex items-center justify-center w-11 h-11 rounded-2xl bg-card text-ink border-[2.5px] border-ink shadow-sticker-sm cursor-pointer transition-transform active:translate-x-[2px] active:translate-y-[3px] active:shadow-none;
+  }
+  .action-btn {
+    @apply flex-1 border-[2.5px] border-ink shadow-sticker font-display font-bold text-[15px] py-4 px-2.5 rounded-[20px] cursor-pointer transition-transform active:translate-x-[3px] active:translate-y-[4px] active:shadow-none;
+  }
+  .sticker-card {
+    @apply bg-card border-[2.5px] border-ink rounded-[20px];
+  }
+  .chip-btn {
+    @apply inline-flex items-center border-2 border-ink rounded-full py-3 px-4 min-h-[44px] font-bold text-[13px] cursor-pointer transition-transform active:scale-95;
+  }
+  .confirm-btn {
+    @apply w-full border-[2.5px] border-ink shadow-sticker-sm bg-violet text-white font-display font-bold text-[15px] py-3 rounded-2xl cursor-pointer active:translate-x-[2px] active:translate-y-[3px] active:shadow-none;
+  }
+}
+
+.star-slot {
+  fill: var(--card);
+  stroke: var(--star-empty);
+  stroke-width: 1.6px;
+  transition: fill 0.3s ease, stroke 0.3s ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.star-slot.filled {
+  fill: var(--gold);
+  stroke: var(--ink);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .star-slot.pulse {
+    animation: starPulse 0.7s ease;
+  }
+}
+@keyframes starPulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.7);
+    filter: drop-shadow(0 0 6px var(--gold-glow));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
