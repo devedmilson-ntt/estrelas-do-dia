@@ -139,22 +139,52 @@ function queueLegacyMigration(family) {
   safeSet(MIGRATED_KEY, family.id)
 }
 
-// Compartilha o código (WhatsApp etc.) ou copia, se o aparelho não suportar
-export async function shareFamilyCode(code) {
+// ---- Convite -------------------------------------------------------------
+
+export function inviteText(code) {
   const url = `${location.origin}/?codigo=${formatCode(code)}`
-  const text = `Entre na nossa família no app Estrelas do dia!\nCódigo: ${formatCode(code)}\n${url}`
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: 'Estrelas do dia', text })
-      return 'shared'
-    } catch (e) {
-      if (e?.name === 'AbortError') return 'cancelled'
-    }
-  }
+  return `Entre na nossa família no app Estrelas do dia!\nCódigo: ${formatCode(code)}\n${url}`
+}
+
+export function whatsappLink(text) {
+  return 'https://wa.me/?text=' + encodeURIComponent(text)
+}
+
+// Janela de compartilhar do sistema. Só existe em https e em parte dos
+// navegadores — por isso quem chama sempre tem um plano B.
+export async function nativeShare(text) {
+  if (!navigator.share || !window.isSecureContext) return 'unsupported'
   try {
-    await navigator.clipboard.writeText(text)
-    return 'copied'
+    await navigator.share({ title: 'Estrelas do dia', text })
+    return 'shared'
+  } catch (e) {
+    return e?.name === 'AbortError' ? 'cancelled' : 'unsupported'
+  }
+}
+
+export async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
   } catch {
-    return 'failed'
+    // cai no método antigo abaixo
+  }
+  // Método antigo: funciona também em http e navegadores mais velhos
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    ta.setSelectionRange(0, text.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
   }
 }

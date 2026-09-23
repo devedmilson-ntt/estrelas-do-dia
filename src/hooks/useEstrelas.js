@@ -25,6 +25,16 @@ export function useEstrelas(family, { onMembershipLost } = {}) {
 
   const history = useMemo(() => snap.past.filter((d) => d.hasData), [snap.past])
 
+  // Dias seguidos batendo a meta: "before" conta até ontem; "total" inclui hoje
+  const streak = useMemo(() => {
+    let before = 0
+    for (const d of snap.past) {
+      if (!d.goalReached) break
+      before++
+    }
+    return { before, total: before + (snap.day.goalReached ? 1 : 0) }
+  }, [snap.past, snap.day.goalReached])
+
   const actions = useMemo(
     () => ({
       addEvent: (type, label, delta) => store.addEvent(type, label, delta),
@@ -33,10 +43,11 @@ export function useEstrelas(family, { onMembershipLost } = {}) {
       markRewardUsed: () => store.markRewardUsed(),
       updateRules: (patch) => store.updateRules(patch),
       addCategory: (kind, label, delta) => store.addCategory(kind, label, delta),
-      removeCategory: (kind, id) => store.removeCategory(kind, id)
+      removeCategory: (kind, id) => store.removeCategory(kind, id),
+      patchConfig: (patch) => store.patchConfig(patch)
     }),
     [store]
   )
 
-  return { ...snap, week, history, ...actions }
+  return { ...snap, week, history, streak, ...actions }
 }

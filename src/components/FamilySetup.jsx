@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { createFamily, formatCode, friendlyError, joinFamily, shareFamilyCode } from '../lib/family.js'
+import { createFamily, formatCode, friendlyError, joinFamily } from '../lib/family.js'
+import InviteButton from './InviteButton.jsx'
 
 const NAME_SUGGESTIONS = ['Pai', 'Mãe', 'Vovô', 'Vovó', 'Tio', 'Tia']
 
@@ -59,7 +60,6 @@ export default function FamilySetup({ notice, onReady }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [family, setFamily] = useState(null)
-  const [shareMsg, setShareMsg] = useState('')
 
   async function run(fn) {
     setError('')
@@ -92,11 +92,6 @@ export default function FamilySetup({ notice, onReady }) {
       clearCodeFromUrl()
       onReady(f)
     })
-  }
-
-  async function share() {
-    const r = await shareFamilyCode(family.code)
-    setShareMsg(r === 'copied' ? 'Convite copiado! Cole no WhatsApp da família.' : r === 'failed' ? 'Anote o código acima.' : '')
   }
 
   return (
@@ -187,14 +182,12 @@ export default function FamilySetup({ notice, onReady }) {
             <div className="text-center font-display font-bold text-[32px] tracking-[0.12em] text-ink bg-bg border-2 rounded-2xl py-3 mb-4" style={{ borderColor: 'var(--line)' }}>
               {formatCode(family.code)}
             </div>
-            <button
-              type="button"
-              className="w-full border-[2.5px] border-ink shadow-sticker-sm bg-teal text-teal-text font-display font-bold text-[15px] py-3 rounded-2xl mb-2"
-              onClick={share}
-            >
-              Enviar convite
-            </button>
-            <p className="text-[12px] font-semibold text-ink-soft text-center min-h-[16px] mt-0 mb-3">{shareMsg}</p>
+            <div className="mb-4">
+              <InviteButton
+                code={family.code}
+                className="w-full border-[2.5px] border-ink shadow-sticker-sm bg-teal text-teal-text font-display font-bold text-[15px] py-3 rounded-2xl"
+              />
+            </div>
             <button type="button" className="confirm-btn" onClick={() => onReady(family)}>
               Começar
             </button>

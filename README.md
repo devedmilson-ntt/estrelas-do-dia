@@ -128,8 +128,9 @@ vite.config.js           → build + configuração do PWA (manifest, service wo
 ```
 
 O saldo de estrelas nunca é gravado no banco: ele é sempre recalculado como
-"estrelas iniciais + soma dos registros do dia" (mínimo 0). Por isso dois
-aparelhos registrando ao mesmo tempo nunca deixam o total errado.
+as estrelas iniciais mais os registros do dia, aplicados em ordem de horário,
+sem nunca passar da meta nem ficar abaixo de 0. Por isso dois aparelhos
+registrando ao mesmo tempo nunca deixam o total errado.
 
 ## Ajustando as regras
 
