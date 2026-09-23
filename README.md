@@ -5,13 +5,55 @@ de estrelas, ganha ou perde estrelas conforme o comportamento registrado, e
 ao atingir a meta libera um tempo de Nintendo Switch à noite. Funciona como
 PWA — pode ser "instalado" na tela inicial do celular como um app nativo.
 
-Tudo roda **localmente no navegador** (localStorage) nesta versão — não
-precisa de servidor nem banco de dados para publicar hoje. Veja "Próximos
-passos" no fim deste arquivo para sincronizar entre aparelhos no futuro.
+Os dados ficam no **Supabase** (plano gratuito) e são compartilhados pela
+família: pai, mãe, avós etc. registram cada um no seu celular e todos veem
+as mudanças na hora. Não há tela de login: cada aparelho entra na família
+uma única vez digitando o **código da família**. O app continua funcionando
+sem internet — os registros ficam numa fila e são enviados quando a conexão
+voltar.
+
+## Configurando o Supabase (uma vez só, ~10 minutos)
+
+1. Crie uma conta em [supabase.com](https://supabase.com) (dá para entrar
+   com o GitHub) e clique em **New project**. Nome: `estrelas-do-dia`;
+   região: **South America (São Paulo)**; crie uma senha forte para o banco
+   e guarde-a (o app não usa, mas o painel pode pedir). Plano: **Free**.
+2. No menu lateral, abra **SQL Editor → New query**, cole todo o conteúdo de
+   [`supabase/schema.sql`](supabase/schema.sql) e clique em **Run**. Deve
+   aparecer "Success. No rows returned".
+3. Abra **Authentication → Sign In / Providers** e ative **Allow anonymous
+   sign-ins**. Salve. (É o "login invisível" de cada aparelho.)
+4. Abra **Project Settings → API Keys** (ou o botão **Connect** no topo) e
+   copie a **Project URL** e a **publishable key** (começa com
+   `sb_publishable_`; em projetos antigos se chama `anon` key).
+5. Para rodar no seu computador: copie `.env.example` para `.env.local` e
+   cole os dois valores.
+6. Na Vercel: **Project Settings → Environment Variables**, cadastre
+   `VITE_SUPABASE_URL` e `VITE_SUPABASE_KEY` (marque Production e Preview).
+   Variáveis novas só valem no próximo deploy.
+
+> O plano grátis do Supabase **pausa o projeto após 7 dias sem nenhum
+> acesso**. Com a família usando todo dia isso não acontece; se acontecer
+> (ex.: férias), entre no painel e clique em **Restore** — nada é perdido.
+
+### Primeira vez com a família
+
+1. **No aparelho que já tem os registros da Fase 1** (se for um iPhone com
+   o app instalado na tela de início, abra pelo ícone, não pelo Safari),
+   toque em **Criar a família**. Os registros e as regras desse aparelho
+   vão junto para o banco.
+2. Toque em **Enviar convite** e mande pelo WhatsApp. Cada pessoa abre o
+   link, escolhe o nome ("Vovô") e pronto.
+3. **iPhone:** o app instalado na tela de início tem memória separada do
+   Safari. Peça para primeiro "Adicionar à Tela de Início", abrir pelo
+   ícone e então digitar o código.
+4. O código fica sempre em **Configurações → Família**, junto com a lista
+   de quem já entrou.
 
 ## Rodando localmente
 
-Pré-requisito: [Node.js](https://nodejs.org) 18 ou mais recente instalado.
+Pré-requisito: [Node.js](https://nodejs.org) 18 ou mais recente instalado,
+e o `.env.local` preenchido (veja acima).
 
 ```bash
 npm install
@@ -71,30 +113,33 @@ ela mesma guia o ajuste do DNS.
 
 ```
 src/
-  App.jsx              → tela principal, junta todos os componentes
-  hooks/useEstrelas.js → toda a lógica de regras (estrelas, meta, eventos)
-  lib/storage.js        → onde os dados são salvos (hoje: localStorage)
+  Root.jsx               → decide: tela de entrada na família ou o app
+  App.jsx                → tela principal, junta todos os componentes
+  hooks/useEstrelas.js   → liga a tela aos dados
+  lib/storage.js         → sincronização: cache local, fila offline, tempo real
+  lib/family.js          → criar/entrar/sair da família, migração da Fase 1
+  lib/supabase.js        → cliente do Supabase (lê as variáveis de ambiente)
   lib/dates.js           → utilitários de data
-  components/            → StarRing, WeekSummary, PickerSheet,
-                            SettingsSheet, HistorySheet, Sheet
-public/icons/            → ícones do PWA (gerados no tema "Brincalhão")
-vite.config.js            → build + configuração do PWA (manifest, service worker)
+  components/            → StarRing, WeekSummary, PickerSheet, SettingsSheet,
+                           HistorySheet, FamilySetup, Sheet
+supabase/schema.sql      → tabelas, regras de segurança e funções do banco
+public/icons/            → ícones do PWA
+vite.config.js           → build + configuração do PWA (manifest, service worker)
 ```
 
-## Ajustando as regras no código
+O saldo de estrelas nunca é gravado no banco: ele é sempre recalculado como
+"estrelas iniciais + soma dos registros do dia" (mínimo 0). Por isso dois
+aparelhos registrando ao mesmo tempo nunca deixam o total errado.
 
-Os valores padrão (5 estrelas iniciais, meta de 8, categorias de motivo)
-estão em `src/lib/storage.js`, na constante `DEFAULT_CONFIG` — mas o app já
-permite editar tudo isso pela tela de Configurações, sem mexer em código.
+## Ajustando as regras
+
+Tudo (estrelas iniciais, meta, minutos, motivos) é editado pela tela de
+Configurações e vale para a família inteira. Os valores iniciais de uma
+família nova estão em `DEFAULT_CONFIG`, em `src/lib/storage.js`. Mudar a
+meta afeta o dia atual, mas não altera o histórico dos dias anteriores.
 
 ## Próximos passos (quando quiser evoluir)
 
-- **Sincronizar entre o celular do pai e da mãe:** hoje cada aparelho guarda
-  seus próprios dados (localStorage). Para sincronizar de verdade, troque as
-  funções de `src/lib/storage.js` por chamadas a um backend como o
-  [Supabase](https://supabase.com) (tem camada gratuita) — a assinatura das
-  funções (`getConfig`, `setConfig`, `getDay`, `setDay`, `listDayKeys`) foi
-  pensada para isso: o resto do app não precisa mudar.
 - **Publicar na Play Store / App Store:** empacote esta mesma pasta com o
   [Capacitor](https://capacitorjs.com/) (`npm install @capacitor/core
   @capacitor/cli`, depois `npx cap init` e `npx cap add android` /

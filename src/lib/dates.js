@@ -21,3 +21,9 @@ export function lastSevenDayKeys() {
   }
   return keys
 }
+
+export function addDays(key, n) {
+  const d = new Date(key + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return dateKey(d)
+}
