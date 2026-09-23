@@ -40,20 +40,39 @@ export function useEstrelas() {
   const addEvent = useCallback(
     (type, label, delta) => {
       const signed = type === 'gain' ? Math.abs(delta) : -Math.abs(delta)
+      const event = {
+        id: 'e' + Date.now() + Math.random().toString(16).slice(2, 6),
+        delta: signed,
+        reason: label,
+        time: Date.now()
+      }
+      setDayState((prev) => recompute({ ...prev, events: [...prev.events, event] }, config))
+      return event
+    },
+    [config]
+  )
+
+  // Remove um registro do dia. O total é recalculado do zero a partir dos
+  // eventos restantes (recompute), então o saldo nunca fica inconsistente.
+  const removeEvent = useCallback(
+    (id) => {
       setDayState((prev) => {
-        const withEvent = {
-          ...prev,
-          events: [
-            ...prev.events,
-            {
-              id: 'e' + Date.now() + Math.random().toString(16).slice(2, 6),
-              delta: signed,
-              reason: label,
-              time: Date.now()
-            }
-          ]
-        }
-        return recompute(withEvent, config)
+        if (!prev.events.some((e) => e.id === id)) return prev
+        return recompute({ ...prev, events: prev.events.filter((e) => e.id !== id) }, config)
+      })
+    },
+    [config]
+  )
+
+  // Desfaz uma remoção: devolve o evento à lista na posição original (por horário).
+  const restoreEvent = useCallback(
+    (event) => {
+      setDayState((prev) => {
+        // Evento de outro dia (virada da meia-noite) ou já presente: ignora
+        if (dateKey(new Date(event.time)) !== prev.date) return prev
+        if (prev.events.some((e) => e.id === event.id)) return prev
+        const events = [...prev.events, event].sort((a, b) => a.time - b.time)
+        return recompute({ ...prev, events }, config)
       })
     },
     [config]
@@ -115,6 +134,8 @@ export function useEstrelas() {
     config,
     day,
     addEvent,
+    removeEvent,
+    restoreEvent,
     markRewardUsed,
     updateRules,
     addCategory,

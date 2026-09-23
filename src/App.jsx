@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useEstrelas } from './hooks/useEstrelas.js'
 import { isWeekend } from './lib/dates.js'
 import StarRing from './components/StarRing.jsx'
@@ -19,6 +19,8 @@ export default function App() {
     config,
     day,
     addEvent,
+    removeEvent,
+    restoreEvent,
     markRewardUsed,
     updateRules,
     addCategory,
@@ -32,15 +34,42 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [weekVisible, setWeekVisible] = useState(() => isWeekend())
   const [pulseKey, setPulseKey] = useState(0)
+  // Último registro adicionado/removido, para o botão "Desfazer"
+  const [undo, setUndo] = useState(null) // { kind: 'added' | 'removed', event } | null
+
+  // O aviso de desfazer some sozinho após alguns segundos
+  useEffect(() => {
+    if (!undo) return
+    const id = setTimeout(() => setUndo(null), 6000)
+    return () => clearTimeout(id)
+  }, [undo])
+
+  // Na virada do dia o aviso não faz mais sentido
+  useEffect(() => {
+    setUndo(null)
+  }, [day.date])
 
   const week = useMemo(() => getWeekSummary(), [getWeekSummary])
   const history = useMemo(() => (historyOpen ? getHistory(30) : []), [historyOpen, getHistory])
   const weekendToday = isWeekend()
 
   function handleConfirmEvent(type, label, delta) {
-    addEvent(type, label, delta)
+    const event = addEvent(type, label, delta)
     if (type === 'gain') setPulseKey((k) => k + 1)
     setPickerType(null)
+    setUndo({ kind: 'added', event })
+  }
+
+  function handleRemoveEvent(ev) {
+    removeEvent(ev.id)
+    setUndo({ kind: 'removed', event: ev })
+  }
+
+  function handleUndo() {
+    if (!undo) return
+    if (undo.kind === 'added') removeEvent(undo.event.id)
+    else restoreEvent(undo.event)
+    setUndo(null)
   }
 
   let statusText
@@ -143,6 +172,16 @@ export default function App() {
                   {ev.delta}
                 </span>
                 <span className="text-ink font-semibold flex-1">{ev.reason}</span>
+                <button
+                  type="button"
+                  aria-label={`Remover registro: ${ev.reason}`}
+                  className="flex items-center justify-center w-8 h-8 -mr-1.5 rounded-full text-ink-soft cursor-pointer bg-transparent border-none active:scale-90 transition-transform"
+                  onClick={() => handleRemoveEvent(ev)}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
               </li>
             )
           })}
@@ -165,6 +204,26 @@ export default function App() {
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
       />
+
+      {undo && (
+        <div
+          role="status"
+          className="fixed left-1/2 -translate-x-1/2 z-40 w-[calc(100%-36px)] max-w-[424px] flex items-center gap-3 bg-ink text-bg rounded-2xl py-3 px-4 shadow-sticker-sm"
+          style={{ bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <span className="flex-1 text-[14px] font-semibold truncate">
+            {undo.kind === 'added' ? 'Registrado' : 'Removido'}: {undo.event.delta > 0 ? '+' : ''}
+            {undo.event.delta} {undo.event.reason}
+          </span>
+          <button
+            type="button"
+            className="font-bold text-[14px] text-gold bg-transparent border-none cursor-pointer py-1 px-1"
+            onClick={handleUndo}
+          >
+            Desfazer
+          </button>
+        </div>
+      )}
 
       <HistorySheet open={historyOpen} history={history} onClose={() => setHistoryOpen(false)} />
     </div>
